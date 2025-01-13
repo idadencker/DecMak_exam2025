@@ -1,0 +1,196 @@
+model {
+
+  ###### Priors ################
+  alpha_a_rew ~  dnorm(0,1)
+  mu_a_rew ~ dnorm(0,1)
+  lambda_a_rew_stein ~ dgamma(.1,.1) 
+  lambda_a_rew_own ~ dgamma(.1,.1) 
+  
+  alpha_a_pun ~  dnorm(0,1)
+  mu_a_pun ~ dnorm(0,1)
+  lambda_a_pun_stein ~ dgamma(.1,.1) 
+  lambda_a_pun_own ~ dgamma(.1,.1) 
+
+  alpha_K ~  dnorm(0,1)
+  mu_K ~ dnorm(0,1)
+  lambda_K_stein ~ dgamma(.1,.1) 
+  lambda_K_own ~ dgamma(.1,.1) 
+  
+  alpha_omega_f ~  dnorm(0,1)
+  mu_omega_f ~ dnorm(0,1)
+  lambda_omega_f_stein ~ dgamma(.1,.1) 
+  lambda_omega_f_own ~ dgamma(.1,.1) 
+  
+  alpha_omega_p ~  dnorm(0,1)
+  mu_omega_p ~ dnorm(0,1)
+  lambda_omega_p_stein ~ dgamma(.1,.1) 
+  lambda_omega_p_own ~ dgamma(.1,.1) 
+
+  #----------- stein model -------------------------------------------
+  for (s in 1:nsubs_stein) {
+
+    a_rew_stein[s] ~ dnorm((mu_a_rew - (alpha_a_rew/2)),lambda_a_rew_stein)T(0,1)
+    a_pun_stein[s] ~ dnorm((mu_a_pun - (alpha_a_pun/2)),lambda_a_pun_stein)T(0,1)
+    K_stein[s]  ~ dnorm((mu_K - (alpha_K/2)),lambda_K_stein)T(0,)
+    theta_stein[s] <- 1# ~ dunif(0,2)
+    omega_f_stein[s] ~ dnorm((mu_omega_f - (alpha_omega_f/2)),lambda_omega_f_stein)
+    omega_p_stein[s] ~ dnorm((mu_omega_p - (alpha_omega_p/2)),lambda_omega_p_stein)
+  
+    #------ set t1 model variables --------------------------
+      
+    Ev_stein[s,1,1] <- 0
+    Ev_stein[s,1,2] <- 0
+    Ev_stein[s,1,3] <- 0
+    Ev_stein[s,1,4] <- 0
+      
+    Ef_stein[s,1,1] <- 0
+    Ef_stein[s,1,2] <- 0
+    Ef_stein[s,1,3] <- 0
+    Ef_stein[s,1,4] <- 0
+      
+    PS_stein[s,1,1] <- 0
+    PS_stein[s,1,2] <- 0
+    PS_stein[s,1,3] <- 0
+    PS_stein[s,1,4] <- 0
+
+    p_stein[s,1,1] <- 0
+    p_stein[s,1,2] <- 0
+    p_stein[s,1,3] <- 0
+    p_stein[s,1,4] <- 0
+
+    for (t in 2:ntrials_stein[s]) {
+      
+      #this is imortant mention this as constructing model
+      signX_stein[s,t] <- ifelse(X_stein[s,t-1]<0,-1,1)
+      
+      for (d in 1:4) {
+        
+        # -------- Updating expected values ------------------------
+        Ev_update_stein[s,t,d] <- ifelse(X_stein[s,t-1]>=0,
+                                  Ev_stein[s,t-1,d] + a_rew_stein[s]*((X_stein[s,t-1]) - Ev_stein[s,t-1,d]), 
+                                  Ev_stein[s,t-1,d] + a_pun_stein[s]*((X_stein[s,t-1]) - Ev_stein[s,t-1,d])
+        )
+                              
+        Ev_stein[s,t,d] <- ifelse(d==x_stein[s,t-1],Ev_update_stein[s,t,d],Ev_stein[s,t-1,d])
+        
+        # -------- Updating expected frequencies ------------------------
+        #update expected frequencies for ALL decks - AS IF THERE WERE ALL CHOSEN
+        Ef_cho_stein[s,t,d] <- ifelse(X_stein[s,t-1]>=0, 
+                                Ef_stein[s,t-1,d] + a_rew_stein[s]*(signX_stein[s,t] - Ef_stein[s,t-1,d]),
+                                Ef_stein[s,t-1,d] + a_pun_stein[s]*(signX_stein[s,t] - Ef_stein[s,t-1,d])
+        )
+        
+        #update expected frequencies for ALL decks - AS IF THEY WERE ALL UNCHOSEN. 
+        Ef_not_stein[s,t,d] <- ifelse(X_stein[s,t-1]>=0, 
+                                Ef_stein[s,t-1,d] + a_pun_stein[s]*(-(signX_stein[s,t]/3) - Ef_stein[s,t-1,d]),
+                                Ef_stein[s,t-1,d] + a_rew_stein[s]*(-(signX_stein[s,t]/3) - Ef_stein[s,t-1,d])
+        ) 
+        
+        #copy appropriate values to ef variable
+        Ef_stein[s,t,d] <- ifelse(d==x_stein[s,t-1],Ef_cho_stein[s,t,d],Ef_not_stein[s,t,d])  
+        #------------------------------------------------------------------
+        
+        #ifelse needed to disctiminate chosen and unchosen decks
+        PS_stein[s,t,d] <- ifelse(x_stein[s,t-1]==d,1/(1+K_stein[s]),PS_stein[s,t-1,d]/(1+K_stein[s]))
+        
+        V_stein[s,t,d] <- Ev_stein[s,t,d] + (Ef_stein[s,t,d]*omega_f_stein[s]) + (PS_stein[s,t,d]*omega_p_stein[s])
+        
+        exp_p_stein[s,t,d] <- exp(theta_stein[s]*V_stein[s,t,d])
+        
+      }
+      
+      for (d in 1:4) {
+        p_stein[s,t,d] <- exp_p_stein[s,t,d]/sum(exp_p_stein[s,t,])
+      }
+        
+      x_stein[s,t] ~ dcat(p_stein[s,t,])
+      
+    }
+  }
+
+  ###################################################
+  #-------- own model----------------------------
+  ###################################################
+  for (s in 1:nsubs_own) {
+
+    a_rew_own[s] ~ dnorm((mu_a_rew + (alpha_a_rew/2)),lambda_a_rew_own)T(0,1)
+    a_pun_own[s] ~ dnorm((mu_a_pun + (alpha_a_pun/2)),lambda_a_pun_own)T(0,1)
+    K_own[s]  ~ dnorm((mu_K + (alpha_K/2)),lambda_K_own)T(0,)
+    theta_own[s] <- 1# ~ dunif(0,2)
+    omega_f_own[s] ~ dnorm((mu_omega_f + (alpha_omega_f/2)),lambda_omega_f_own)
+    omega_p_own[s] ~ dnorm((mu_omega_p + (alpha_omega_p/2)),lambda_omega_p_own)
+  
+    #------ set t1 model variables --------------------------
+      
+    Ev_own[s,1,1] <- 0
+    Ev_own[s,1,2] <- 0
+    Ev_own[s,1,3] <- 0
+    Ev_own[s,1,4] <- 0
+      
+    Ef_own[s,1,1] <- 0
+    Ef_own[s,1,2] <- 0
+    Ef_own[s,1,3] <- 0
+    Ef_own[s,1,4] <- 0
+      
+    PS_own[s,1,1] <- 0
+    PS_own[s,1,2] <- 0
+    PS_own[s,1,3] <- 0
+    PS_own[s,1,4] <- 0
+
+    p_own[s,1,1] <- 0
+    p_own[s,1,2] <- 0
+    p_own[s,1,3] <- 0
+    p_own[s,1,4] <- 0
+
+    for (t in 2:ntrials_own[s]) {
+      
+      #this is imortant mention this as constructing model
+      signX_own[s,t] <- ifelse(X_own[s,t-1]<0,-1,1)
+      
+      for (d in 1:4) {
+        
+        # -------- Updating expected values ------------------------
+        Ev_update_own[s,t,d] <- ifelse(X_own[s,t-1]>=0,
+                                  Ev_own[s,t-1,d] + a_rew_own[s]*((X_own[s,t-1]) - Ev_own[s,t-1,d]), 
+                                  Ev_own[s,t-1,d] + a_pun_own[s]*((X_own[s,t-1]) - Ev_own[s,t-1,d])
+        )
+                              
+        Ev_own[s,t,d] <- ifelse(d==x_own[s,t-1],Ev_update_own[s,t,d],Ev_own[s,t-1,d])
+        
+        # -------- Updating expected frequencies ------------------------
+        #update expected frequencies for ALL decks - AS IF THERE WERE ALL CHOSEN
+        Ef_cho_own[s,t,d] <- ifelse(X_own[s,t-1]>=0, 
+                                Ef_own[s,t-1,d] + a_rew_own[s]*(signX_own[s,t] - Ef_own[s,t-1,d]),
+                                Ef_own[s,t-1,d] + a_pun_own[s]*(signX_own[s,t] - Ef_own[s,t-1,d])
+        )
+        
+        #update expected frequencies for ALL decks - AS IF THEY WERE ALL UNCHOSEN. 
+        Ef_not_own[s,t,d] <- ifelse(X_own[s,t-1]>=0, 
+                                Ef_own[s,t-1,d] + a_pun_own[s]*(-(signX_own[s,t]/3) - Ef_own[s,t-1,d]),
+                                Ef_own[s,t-1,d] + a_rew_own[s]*(-(signX_own[s,t]/3) - Ef_own[s,t-1,d])
+        ) 
+        
+        #copy appropriate values to ef variable
+        Ef_own[s,t,d] <- ifelse(d==x_own[s,t-1],Ef_cho_own[s,t,d],Ef_not_own[s,t,d])  
+        #------------------------------------------------------------------
+        
+        #ifelse needed to disctiminate chosen and unchosen decks
+        PS_own[s,t,d] <- ifelse(x_own[s,t-1]==d,1/(1+K_own[s]),PS_own[s,t-1,d]/(1+K_own[s]))
+        
+        V_own[s,t,d] <- Ev_own[s,t,d] + Ef_own[s,t,d]*omega_f_own[s] + PS_own[s,t,d]*omega_p_own[s]
+        
+        exp_p_own[s,t,d] <- exp(theta_own[s]*V_own[s,t,d])
+        
+      }
+      
+      for (d in 1:4) {
+        p_own[s,t,d] <- exp_p_own[s,t,d]/sum(exp_p_own[s,t,])
+      }
+        
+      x_own[s,t] ~ dcat(p_own[s,t,])
+      
+    }
+  }
+
+
+}

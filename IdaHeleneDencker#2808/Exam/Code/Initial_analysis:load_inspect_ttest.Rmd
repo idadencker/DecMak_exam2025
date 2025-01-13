@@ -1,0 +1,206 @@
+library(dplyr)
+
+# Read in steingrover
+steingrover <-read.csv('/work/IdaHeleneDencker#2808/Exam/Data/617_data/Steingrover_data.csv')
+steingrover <- steingrover[,-1]
+length(unique(steingrover$sub_ID)) #70 participants
+#Take only first 50 participants
+steingrover <- head(steingrover, 5000)
+# New accumulated score column (just substracting 2000 from the old one)
+steingrover$new_accumulated_score <- steingrover$accumulated_score - 2000
+
+
+# Read in own
+own <-read.csv('/work/IdaHeleneDencker#2808/Exam/Data/Own_data/combined.csv')
+own <- own[,-1] 
+## Exclude Ida (143) and Mikkel (138)
+own <- own[!(own$sub_ID %in% "138"),]
+own <- own[!(own$sub_ID %in% "143"),]
+# New accumulated_score column with the logic of taking the accumulated score for each session into the next session
+own_new <- own %>%
+  group_by(sub_ID) %>%
+  mutate(
+    new_accumulated_score = ifelse(session == 2, accumulated_score + accumulated_score[session == 1 & no == 40][1], accumulated_score),
+    new_accumulated_score = ifelse(session == 3, new_accumulated_score + new_accumulated_score[session == 2 & no == 40][1], new_accumulated_score)
+  ) %>%
+  ungroup()
+# now crop data to have no 1-100 (first 100 rows per participant)
+own_new <- own_new %>%
+  group_by(sub_ID) %>%
+  slice_head(n = 100) %>%  # Select only the first 100 rows for each participant
+  mutate(new_no = 1:n()) %>%  # Create the new 'new_no' column ranging from 1 to 100
+  ungroup()  # Remove grouping after the operation
+## Save as 2 groups 
+own_fmri <-own[own$data_type == 'fmri',] #5 participants 
+own_MEG <-own[own$data_type == 'MEG',] #5 participants 
+
+
+
+# Calculate avarage accumulated score for 3 groups as initial envestigation:
+
+## First For own fmri (5 participants)
+own_fmri_scores <- own_fmri %>%
+  group_by(sub_ID) %>%
+  summarize(
+    score_session_1 = sum(accumulated_score[session == 1 & no == 40]),
+    score_session_2 = sum(accumulated_score[session == 2 & no == 40]),
+    score_session_3 = sum(accumulated_score[session == 3 & no == 20]),
+    total_score = score_session_1 + score_session_2 + score_session_3
+  )
+average_score_fmri <- mean(own_fmri_scores$total_score)
+
+
+## For own meg (5 participants)
+own_meg_scores <- own_MEG %>%
+  group_by(sub_ID) %>%
+  summarize(
+    score_session_1 = sum(accumulated_score[session == 1 & no == 40]),
+    score_session_2 = sum(accumulated_score[session == 2 & no == 40]),
+    score_session_3 = sum(accumulated_score[session == 3 & no == 20]),
+    total_score = score_session_1 + score_session_2 + score_session_3
+  )
+average_score_meg <- mean(own_meg_scores$total_score)
+
+
+## For steingrover (50 participants)
+stein_scores <- steingrover %>%
+  group_by(sub_ID) %>%
+  summarize(
+    score_session_1 = sum(accumulated_score[session == 1 & no == 100]),
+    #2000 is substracted to be able to compare across the 3 groups 
+    total_score = score_session_1 - 2000
+  )
+average_score_stein <- mean(stein_scores$total_score)
+
+
+## own as 1 big group (10 participants)
+own_scores <- own %>%
+  group_by(sub_ID) %>%
+  summarize(
+    score_session_1 = sum(accumulated_score[session == 1 & no == 40]),
+    score_session_2 = sum(accumulated_score[session == 2 & no == 40]),
+    score_session_3 = sum(accumulated_score[session == 3 & no == 20]),
+    total_score = score_session_1 + score_session_2 + score_session_3
+  )
+average_score_own <- mean(own_scores$total_score)
+
+## T-test
+#drop column 2,3,4 in own_scores and ad new column type == own
+own_scores_for_ttest <- own_scores %>%
+  select(-c(2, 3, 4)) %>% # Drop columns 2, 3, and 4
+  mutate(type = "own")    # Add new column `type` with value "own"
+
+#add new column type == stein to stein_scores
+stein_scores_for_ttest <- stein_scores %>%
+  select(-c(2)) %>% 
+  mutate(type = "stein")
+
+#combine own_scores_for_ttest and stein_scores by column sub_ID
+combined_for_t_test <- bind_rows(own_scores_for_ttest, stein_scores_for_ttest)
+
+#t-test
+t.test(combined_for_t_test$total_score ~ combined_for_t_test$type)
+
+
+
+# Investigate deck selection for the 2 groups 
+#1 is A, 2 is B etc. 
+
+deck_selection_own <- own %>%
+  group_by(deck_select) %>%             
+  summarize(count = n()) %>%
+  mutate(percentage = (count / sum(count)) * 100) %>%
+  arrange(desc(percentage))
+deck_selection_own <- deck_selection_own[order(deck_selection_own$deck_select, decreasing = FALSE), ] 
+  
+
+deck_selection_stein <- steingrover %>%
+  group_by(deck_select) %>%             
+  summarize(count = n()) %>%
+  mutate(percentage = (count / sum(count)) * 100) %>%
+  arrange(desc(percentage))  
+deck_selection_stein <- deck_selection_stein[order(deck_selection_stein$deck_select, decreasing = FALSE), ] 
+
+# Make new df's to use in the script
+# Columns must be subjID, deck (1,2,3,4), gain, loss, trial
+own_use<-own_new %>%
+  select(win,loss,deck_select, new_no, sub_ID)
+names(own_use)[names(own_use) == 'win'] <- 'gain'
+names(own_use)[names(own_use) == 'deck_select'] <- 'deck'
+names(own_use)[names(own_use) == 'new_no'] <- 'trial'
+names(own_use)[names(own_use) == 'sub_ID'] <- 'subjID'
+# 8 rows where deck is 0
+# However gain and loss columns are still assigned as if they chose one
+# Therefore, deck value will be assigned manually according to the gains and losses
+# The ones where loss is 0 and gain is 50 or 100 we cant be certain what deck that is, but we will assign them anyways
+own_use <- own_use %>%
+  mutate(
+    deck = case_when(
+      deck == 0 & loss == -250 & gain == 50 ~ 4,   #deck will be 4
+      deck == 0 & loss == -250 & gain == 100 ~ 1,  #deck will be 1
+      deck == 0 & loss == 0 & gain == 50 ~ 4,   #deck will be 4
+      deck == 0 & loss == 0 & gain == 100 ~ 2,  #deck will be 2
+      TRUE ~ deck))
+write.table(own_use,"/work/IdaHeleneDencker#2808/Exam/Data/Own_data/own.txt",row.names=FALSE)
+
+stein_use<-steingrover %>%
+  select(win,loss,deck_select,no, sub_ID)
+names(stein_use)[names(stein_use) == 'win'] <- 'gain'
+names(stein_use)[names(stein_use) == 'deck_select'] <- 'deck'
+names(stein_use)[names(stein_use) == 'no'] <- 'trial'
+names(stein_use)[names(stein_use) == 'sub_ID'] <- 'subjID'
+write.table(stein_use,"/work/IdaHeleneDencker#2808/Exam/Data/617_data/stein.txt", row.names = FALSE)
+#Sys.sleep(1)  # Wait for a moment to ensure the file system catches up
+
+#unique(stein_use$deck)
+#unique(stein_use$subjID)
+
+
+
+
+
+## Identify outliers
+#identify outliers (participants choosing a particular deck very much)
+# Step 1: Count the frequency of deck choices per participant
+#deck_counts <- stein_use %>%
+  #group_by(subjID, deck) %>%
+  #summarise(count = n(), .groups = 'drop')
+  
+# Step 2: Calculate the total trials per participant and the proportion per deck
+#deck_proportions <- deck_counts %>%
+  #group_by(subjID) %>%
+  #mutate(total_trials = sum(count),
+         #proportion = count / total_trials)
+         
+# Step 3: Identify outliers (e.g., proportion > 80% for any deck)
+#outliers <- deck_proportions %>%
+  #filter(proportion > 0.6)
+  
+# Filter participants with deck proportions above 0.8 (or any threshold)
+#outliers <- deck_proportions %>%
+  #filter(proportion > 0.7)
+
+# Create a scatter plot
+#ggplot(outliers, aes(x = subjID, y = proportion, color = factor(deck), label = subjID)) +
+  #geom_point(size = 4) +                        # Scatter plot with larger dots
+  #geom_text(vjust = -1, hjust = 0.5) +          # Add text labels for subjID
+  #scale_color_brewer(palette = "Set1") +        # Use a color palette for decks
+  #labs(
+    #title = "Participants Choosing a Single Deck Predominantly",
+    #x = "Subject ID",
+    #y = "Proportion of Trials on a Single Deck",
+    #color = "Deck"
+  #) +
+  #theme_minimal() +
+  #theme(
+    #axis.text.x = element_text(angle = 45, hjust = 1) # Rotate x-axis labels for readability
+  #)
+  
+# exclude Subject in outliers
+#take stein_use df
+# exlude all rows where the value of the subjID == present in the subjID in the outliers df
+#call the new df 'stein_use_reduced'
+#stein_use_reduced <- stein_use %>%
+  #filter(!(subjID %in% outliers$subjID))
+#write.table(stein_use_reduced,"/work/IdaHeleneDencker#2808/Exam/Data/617_data/stein_reduced.txt", row.names = FALSE)
+

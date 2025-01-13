@@ -1,0 +1,34 @@
+Inference for Bugs model at "ORL_hier.txt", fit using jags,
+ 3 chains, each with 5000 iterations (first 1000 discarded)
+ n.sims = 12000 iterations saved. Running time = secs
+                mu.vect sd.vect     2.5%      25%      50%      75%    97.5%
+lambda_K          0.054   0.073    0.002    0.009    0.026    0.071    0.256
+lambda_a_pun    278.857 126.934   99.066  186.717  257.447  346.183  587.068
+lambda_a_rew    169.754 106.483   44.328   90.805  141.471  222.477  439.328
+lambda_omega_f   36.122  53.205    1.110    2.770   18.342   46.055  185.557
+lambda_omega_p   17.073  37.202    0.248    1.398    4.015   15.027  120.467
+mu_K              1.350   0.764    0.101    0.764    1.299    1.856    2.976
+mu_a_pun          0.228   0.022    0.186    0.213    0.227    0.242    0.274
+mu_a_rew          0.256   0.031    0.194    0.235    0.256    0.276    0.317
+mu_omega_f        1.539   0.172    1.138    1.440    1.563    1.657    1.819
+mu_omega_p        0.330   0.475   -0.415    0.027    0.244    0.576    1.489
+deviance       3631.133  13.834 3607.524 3620.693 3629.930 3640.681 3659.806
+                Rhat n.eff
+lambda_K       1.086    28
+lambda_a_pun   1.031    73
+lambda_a_rew   1.746     6
+lambda_omega_f 3.221     4
+lambda_omega_p 1.036    64
+mu_K           1.088    33
+mu_a_pun       1.040    57
+mu_a_rew       1.101    28
+mu_omega_f     1.585     7
+mu_omega_p     1.234    13
+deviance       1.993     5
+
+For each parameter, n.eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor (at convergence, Rhat=1).
+
+DIC info (using the rule: pV = var(deviance)/2)
+pV = 48.7 and DIC = 3679.9
+DIC is an estimate of expected predictive error (lower deviance is better).

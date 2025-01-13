@@ -1,0 +1,24 @@
+Inference for Bugs model at "ORL_compare.txt", fit using jags,
+ 2 chains, each with 5000 iterations (first 1000 discarded)
+ n.sims = 8000 iterations saved. Running time = secs
+                mu.vect sd.vect      2.5%       25%       50%       75%
+alpha_K           0.133   1.005    -1.824    -0.557     0.116     0.836
+alpha_a_pun       0.009   0.791    -1.530    -0.516     0.022     0.535
+alpha_a_rew       0.439   0.925    -1.393    -0.182     0.440     1.059
+alpha_omega_f    -0.115   0.501    -1.130    -0.437    -0.102     0.221
+alpha_omega_p    -0.428   0.912    -2.233    -1.042    -0.433     0.174
+deviance      10521.997  28.030 10469.230 10502.603 10520.743 10540.684
+                  97.5%  Rhat n.eff
+alpha_K           2.134 1.004   420
+alpha_a_pun       1.527 1.008   200
+alpha_a_rew       2.251 1.001  8000
+alpha_omega_f     0.855 1.001  8000
+alpha_omega_p     1.392 1.001  3500
+deviance      10579.429 1.010   170
+
+For each parameter, n.eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor (at convergence, Rhat=1).
+
+DIC info (using the rule: pV = var(deviance)/2)
+pV = 390.6 and DIC = 10912.6
+DIC is an estimate of expected predictive error (lower deviance is better).

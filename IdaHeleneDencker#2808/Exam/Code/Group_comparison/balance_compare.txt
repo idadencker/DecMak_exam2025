@@ -1,0 +1,41 @@
+model {
+
+  ###### Priors ################
+  alpha ~  dnorm(0,1)
+  mu ~ dnorm(0,1)
+
+  #variability between subjects
+  Glambda ~ dgamma(.1,.1) 
+  
+  #variability between trials
+  #Slambda ~ dgamma(.1,.1)
+
+  ##############################
+  
+  for (s in 1:nsubs_stein) {
+
+    #variability between trials
+    Slambda_stein[s] ~ dgamma(1,1) 
+
+    #Smu_stein[s] ~ dnorm((mu + (alpha/2)),Glambda)
+    #xcum_stein[s,100] ~ dnorm(Smu_stein[s],Slambda_stein[s])
+  
+    xcum_stein[s,100] ~ dnorm((mu + (alpha/2)),Glambda)
+  
+  }
+
+  for (s in 1:nsubs_own) {
+
+    #variability between trials
+    Slambda_own[s] ~ dgamma(1,1) 
+
+    #Smu_own[s] ~ dnorm((mu - (alpha/2)),Glambda)
+    #xcum_own[s,100] ~ dnorm(Smu_own[s],Slambda_own[s])
+    
+    xcum_own[s,100] ~ dnorm((mu + (alpha/2)),Glambda)
+
+  
+  }
+
+
+}
